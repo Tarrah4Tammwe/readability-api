@@ -1,27 +1,28 @@
-// app/api/compare/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { analyseText } from '@/lib/readability'
+
+type AnalyseResult = ReturnType<typeof analyseText>
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     const { text_a, text_b } = body
 
-    if (!text_a || typeof text_a !== 'string') {
-      return NextResponse.json(
-        { success: false, error: 'Missing required field: text_a (string)' },
-        { status: 400 }
-      )
-    }
-    if (!text_b || typeof text_b !== 'string') {
-      return NextResponse.json(
-        { success: false, error: 'Missing required field: text_b (string)' },
-        { status: 400 }
-      )
-    }
+    if (!text_a || typeof text_a !== 'string')
+      return NextResponse.json({ success: false, error: 'Missing required field: text_a (string)' }, { status: 400 })
+    if (!text_b || typeof text_b !== 'string')
+      return NextResponse.json({ success: false, error: 'Missing required field: text_b (string)' }, { status: 400 })
 
-    const resultA = analyseText(text_a)
-    const resultB = analyseText(text_b)
+    const resultA = analyseText(text_a) as AnalyseResult & {
+      scores: { fleschReadingEase: { score: number } }
+      overall: { averageGradeLevel: number; verdict: string }
+      textStats: { wordCount: number }
+    }
+    const resultB = analyseText(text_b) as AnalyseResult & {
+      scores: { fleschReadingEase: { score: number } }
+      overall: { averageGradeLevel: number; verdict: string }
+      textStats: { wordCount: number }
+    }
 
     const scoreA = resultA.scores.fleschReadingEase.score
     const scoreB = resultB.scores.fleschReadingEase.score
@@ -30,13 +31,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       text_a: {
-        fleschReadingEase: resultA.scores.fleschReadingEase.score,
+        fleschReadingEase: scoreA,
         gradeLevel: resultA.overall.averageGradeLevel,
         verdict: resultA.overall.verdict,
         wordCount: resultA.textStats.wordCount,
       },
       text_b: {
-        fleschReadingEase: resultB.scores.fleschReadingEase.score,
+        fleschReadingEase: scoreB,
         gradeLevel: resultB.overall.averageGradeLevel,
         verdict: resultB.overall.verdict,
         wordCount: resultB.textStats.wordCount,
@@ -45,15 +46,12 @@ export async function POST(req: NextRequest) {
         moreReadable,
         easeDifference: parseFloat(Math.abs(scoreA - scoreB).toFixed(1)),
         gradeDifference: parseFloat(
-          Math.abs(
-            resultA.overall.averageGradeLevel -
-              resultB.overall.averageGradeLevel
-          ).toFixed(1)
+          Math.abs(resultA.overall.averageGradeLevel - resultB.overall.averageGradeLevel).toFixed(1)
         ),
         summary:
           moreReadable === 'text_a'
-            ? `text_a is easier to read by ${Math.abs(scoreA - scoreB).toFixed(1)} points`
-            : `text_b is easier to read by ${Math.abs(scoreA - scoreB).toFixed(1)} points`,
+            ? `text_a is easier to read by ${Math.abs(scoreA - scoreB).toFixed(1)} Flesch points`
+            : `text_b is easier to read by ${Math.abs(scoreA - scoreB).toFixed(1)} Flesch points`,
       },
     })
   } catch (err: unknown) {
@@ -71,9 +69,9 @@ export async function GET() {
       text_b: 'string (required) — second text',
     },
     returns: [
-      'Readability scores for both texts',
+      'Flesch Reading Ease, grade level, verdict, and word count for both texts',
       'moreReadable: which text scores higher',
-      'easeDifference: points difference in Flesch Reading Ease',
+      'easeDifference: Flesch points difference',
       'gradeDifference: grade level difference',
     ],
   })
