@@ -6,13 +6,36 @@ export function countSyllables(word: string): number {
   if (!word) return 0
   if (word.length <= 3) return 1
 
-  // Remove trailing silent e
-  word = word.replace(/e$/, '')
-  // Remove trailing ed, es unless it's the whole word
-  word = word.replace(/(?:ed|es)$/, '')
+  // Count vowel groups
+  let count = 0
+  let prevVowel = false
+  for (let i = 0; i < word.length; i++) {
+    const isVowel = 'aeiouy'.includes(word[i])
+    if (isVowel && !prevVowel) count++
+    prevVowel = isVowel
+  }
 
-  const vowelGroups = word.match(/[aeiouy]+/g)
-  const count = vowelGroups ? vowelGroups.length : 1
+  // Silent trailing 'e' (make, take) — not for 'le', 'ee', 'oe', 'ed' endings
+  if (
+    word.endsWith('e') &&
+    !word.endsWith('le') &&
+    !word.endsWith('ee') &&
+    !word.endsWith('oe') &&
+    !word.endsWith('ed') &&
+    count > 1 &&
+    !'aeiouy'.includes(word[word.length - 2])
+  ) {
+    count--
+  }
+
+  // Silent '-ed' ending (jumped, called) — NOT silent after t/d (wanted, needed)
+  if (word.endsWith('ed') && word.length > 3) {
+    const beforeEd = word[word.length - 3]
+    if (!'td'.includes(beforeEd) && !'aeiouy'.includes(beforeEd)) {
+      count = Math.max(1, count - 1)
+    }
+  }
+
   return Math.max(1, count)
 }
 
@@ -63,13 +86,8 @@ export function fleschReadingEase(stats: ReturnType<typeof getTextStats>): {
   interpretation: string
   suitableFor: string
 } {
-  const score = parseFloat(
-    (
-      206.835 -
-      1.015 * stats.avgSentenceLength -
-      84.6 * stats.avgSyllablesPerWord
-    ).toFixed(1)
-  )
+  const raw = 206.835 - 1.015 * stats.avgSentenceLength - 84.6 * stats.avgSyllablesPerWord
+  const score = parseFloat(Math.min(100, Math.max(0, raw)).toFixed(1))
 
   let interpretation: string
   let suitableFor: string
