@@ -202,4 +202,19 @@ Compare the readability of two texts side by side.
 }
 ```
 
-All errors return an appropriate HTTP status code (400 for bad input, 500 for server errors) with a plain-English `error` field describing exactly what went wrong.
+All errors return an appropriate HTTP status code with a plain-English `error` field describing exactly what went wrong.
+
+| Status | When |
+|---|---|
+| 400 | Bad input (missing fields, invalid URL, text too short) |
+| 413 | Request or fetched page exceeds size limits |
+| 429 | Rate limit exceeded (60 POST requests per IP per minute) |
+| 500 | Unexpected server error |
+| 504 | Timed out fetching a URL |
+
+## Limits and security
+
+- **Text size:** 100,000 characters per text field.
+- **URL fetch:** public `http`/`https` URLs on port 80 or 443 only. Private, loopback, link-local, and cloud-metadata hosts are blocked. Redirects are re-checked. Fetched pages are capped at 1 MB.
+- Provide **either** `text` **or** `url`, not both.
+- **Rate limit:** 60 POST requests per IP per minute. Production deployments should also put a gateway (for example RapidAPI) in front of the service.

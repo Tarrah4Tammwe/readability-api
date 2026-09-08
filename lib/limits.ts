@@ -1,0 +1,10 @@
+export const MAX_JSON_BODY_BYTES = 256_000
+export const MAX_TEXT_CHARS = 100_000
+export const MAX_URL_LENGTH = 2048
+export const MAX_FETCH_BYTES = 1_048_576
+export const FETCH_TIMEOUT_MS = 8000
+export const MAX_REDIRECTS = 3
+export const MAX_SENTENCE_BREAKDOWN = 200
+export const RATE_LIMIT_WINDOW_MS = 60_000
+export const RATE_LIMIT_MAX_POSTS = 60
+export const ALLOWED_FETCH_PORTS = new Set(['', '80', '443'])
