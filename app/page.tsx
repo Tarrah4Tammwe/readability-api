@@ -99,7 +99,6 @@ export default function Home() {
         }
         .score-card-desc {
           font-size: 12px;
-          color: #6060780;
           color: #606078;
           line-height: 1.5;
         }
@@ -215,7 +214,7 @@ export default function Home() {
           Send any English text, get back Flesch-Kincaid, Gunning Fog, SMOG, ARI scores and a plain-English verdict in one API call.
         </p>
         <div className="cta-row">
-          <a className="btn-primary" href="https://rapidapi.com" target="_blank" rel="noopener">Try on RapidAPI</a>
+          <a className="btn-primary" href="https://rapidapi.com" target="_blank" rel="noopener noreferrer">Try on RapidAPI</a>
           <a className="btn-secondary" href="/api/analyze">View endpoint →</a>
         </div>
       </div>
@@ -262,11 +261,12 @@ export default function Home() {
             <span className="method-badge">POST</span>
             <span className="endpoint-path">/api/analyze</span>
           </div>
-          <p className="endpoint-desc">Analyse a single piece of text. Returns all 5 scores plus text statistics and an overall verdict.</p>
+          <p className="endpoint-desc">Analyse a single piece of text or a public URL. Returns all 5 scores plus suggestions, sentence breakdown, and an optional target-grade pass/fail.</p>
           <div className="code-block">
-            <span className="comment">// Request body</span>{'\n'}
+            <span className="comment">// Request body — send text or url</span>{'\n'}
             {'{'}{'\n'}
-            {'  '}<span className="key">"text"</span>: <span className="str">"Your content goes here."</span>{'\n'}
+            {'  '}<span className="key">"text"</span>: <span className="str">"Your content goes here."</span>,{'\n'}
+            {'  '}<span className="key">"target_grade"</span>: <span className="num">8</span>{'\n'}
             {'}'}
           </div>
         </div>
@@ -324,7 +324,7 @@ export default function Home() {
         <span className="footer-text">Readability API — built for developers</span>
         <div className="footer-links">
           <a href="/api/analyze">Docs</a>
-          <a href="https://rapidapi.com" target="_blank" rel="noopener">RapidAPI</a>
+          <a href="https://rapidapi.com" target="_blank" rel="noopener noreferrer">RapidAPI</a>
         </div>
       </footer>
     </>

@@ -1,5 +1,8 @@
 // lib/readability.ts
 
+import { ClientError } from './errors'
+import { MAX_SENTENCE_BREAKDOWN } from './limits'
+
 // ─── Syllable counter ────────────────────────────────────────────────────────
 
 export function countSyllables(word: string): number {
@@ -62,28 +65,29 @@ export function getTextStats(text: string) {
   const words = countWords(text)
   const wordCount = words.length
   const sentences = splitSentences(text)
-  const sentenceCount = Math.max(1, sentences.length)
+  const sentenceCount = sentences.length === 0 ? (wordCount > 0 ? 1 : 0) : sentences.length
   const charCount = text.replace(/\s/g, '').length
 
   const syllableCounts = words.map(w => countSyllables(w))
   const totalSyllables = syllableCounts.reduce((a, b) => a + b, 0)
   const polysyllabicWords = words.filter((_, i) => syllableCounts[i] >= 3)
 
-  const avgSentenceLength = wordCount / sentenceCount
-  const avgSyllablesPerWord = totalSyllables / wordCount
+  const avgSentenceLength = sentenceCount > 0 ? wordCount / sentenceCount : 0
+  const avgSyllablesPerWord = wordCount > 0 ? totalSyllables / wordCount : 0
 
   return {
     wordCount,
     sentenceCount,
-    sentences,
+    sentences: sentences.length ? sentences : wordCount > 0 ? [text.trim()] : [],
     charCount,
     totalSyllables,
     avgSentenceLength,
     avgSyllablesPerWord,
     polysyllabicWordCount: polysyllabicWords.length,
-    polysyllabicWordPercentage: parseFloat(
-      ((polysyllabicWords.length / wordCount) * 100).toFixed(1)
-    ),
+    polysyllabicWordPercentage:
+      wordCount > 0
+        ? parseFloat(((polysyllabicWords.length / wordCount) * 100).toFixed(1))
+        : 0,
   }
 }
 
@@ -219,7 +223,8 @@ export function getSuggestions(
 // ─── Sentence breakdown ───────────────────────────────────────────────────────
 
 export function getSentenceBreakdown(sentences: string[]) {
-  return sentences.map((sentence, index) => {
+  const limited = sentences.slice(0, MAX_SENTENCE_BREAKDOWN)
+  return limited.map((sentence, index) => {
     const words = countWords(sentence)
     if (words.length < 3) {
       return { index: index + 1, sentence, wordCount: words.length, fre: 100, grade: 0, complexity: 'Very easy' }
@@ -260,10 +265,14 @@ export function getTargetResult(avgGrade: number, targetGrade: number) {
 // ─── Main analyseText function ────────────────────────────────────────────────
 
 export function analyseText(text: string, targetGrade?: number) {
-  if (!text || text.trim().length < 10) throw new Error('Text must be at least 10 characters')
+  if (!text || text.trim().length < 10) {
+    throw new ClientError('Text must be at least 10 characters')
+  }
 
   const stats = getTextStats(text)
-  if (stats.wordCount < 5) throw new Error('Text must contain at least 5 words for accurate scoring')
+  if (stats.wordCount < 5) {
+    throw new ClientError('Text must contain at least 5 words for accurate scoring')
+  }
 
   const fre = fleschReadingEase(stats)
   const fkg = fleschKincaidGrade(stats)
@@ -305,6 +314,9 @@ export function analyseText(text: string, targetGrade?: number) {
     sentenceBreakdown: {
       all: sentenceBreakdown,
       hardest: hardestSentences,
+      ...(stats.sentences.length > MAX_SENTENCE_BREAKDOWN
+        ? { truncated: true, totalSentences: stats.sentences.length }
+        : {}),
     },
   }
 
