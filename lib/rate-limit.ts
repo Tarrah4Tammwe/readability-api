@@ -7,19 +7,13 @@ type Bucket = { count: number; resetAt: number }
 const buckets = new Map<string, Bucket>()
 const MAX_BUCKETS = 10_000
 
-function prune(now: number) {
-  if (buckets.size < MAX_BUCKETS) {
-    for (const [key, bucket] of buckets) {
-      if (bucket.resetAt <= now) buckets.delete(key)
-    }
-    return
-  }
-  buckets.clear()
+function prune() {
+  if (buckets.size >= MAX_BUCKETS) buckets.clear()
 }
 
 export function rateLimitPost(req: NextRequest): NextResponse | null {
   const now = Date.now()
-  prune(now)
+  prune()
   const key = clientIp(req)
   const existing = buckets.get(key)
   if (!existing || existing.resetAt <= now) {
