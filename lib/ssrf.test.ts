@@ -76,6 +76,6 @@ describe('assertSafePublicHttpUrl', () => {
 
   it('allows hosts that resolve only to public addresses', async () => {
     const url = await assertSafePublicHttpUrl('https://example.com/page', async () => ['93.184.216.34'])
-    assert.equal(url.hostname, 'example.com')
+    assert.equal(url.url.hostname, 'example.com')
   })
 })

@@ -99,7 +99,7 @@ export default function Home() {
         }
         .score-card-desc {
           font-size: 12px;
-          color: #606078;
+          color: #9090a8;
           line-height: 1.5;
         }
         .score-dot {
@@ -222,7 +222,7 @@ export default function Home() {
       {/* Scores */}
       <div className="section">
         <p className="section-label">What you get</p>
-        <h2>5 scores. One call.</h2>
+        <h2>Six scores. One call.</h2>
         <div className="scores-grid">
           <div className="score-card">
             <div className="score-card-name"><span className="score-dot"></span>Flesch Reading Ease</div>

@@ -1,3 +1,5 @@
+import { isIP } from 'node:net'
+import { Agent, fetch as undiciFetch } from 'undici'
 import { ClientError } from './errors'
 import { htmlToText } from './html-text'
 import { FETCH_TIMEOUT_MS, MAX_FETCH_BYTES, MAX_REDIRECTS, MAX_TEXT_CHARS } from './limits'
@@ -71,15 +73,61 @@ function resolveRedirect(current: URL, location: string): string {
   return next.toString()
 }
 
+async function pinnedFetch(
+  url: URL,
+  addresses: string[],
+  init: RequestInit
+): Promise<{ res: Response; agent: Agent }> {
+  const agent = new Agent({
+    connect: {
+      lookup(_hostname, opts, cb) {
+        const callback = (typeof opts === 'function' ? opts : cb) as (
+          err: Error | null,
+          address?: string | Array<{ address: string; family: number }>,
+          family?: number
+        ) => void
+        const options = typeof opts === 'function' ? {} : opts
+        const want4 = options.family === 4
+        const want6 = options.family === 6
+        const match = addresses.find(addr => {
+          const version = isIP(addr)
+          if (want4) return version === 4
+          if (want6) return version === 6
+          return version === 4 || version === 6
+        })
+        if (!match) {
+          callback(new Error('No allowed addresses'))
+          return
+        }
+        const family = isIP(match) === 6 ? 6 : 4
+        if (options.all) {
+          callback(null, [{ address: match, family }])
+          return
+        }
+        callback(null, match, family)
+      },
+    },
+  })
+  const headers = new Headers(init.headers)
+  const res = (await undiciFetch(url.toString(), {
+    method: init.method,
+    headers,
+    signal: init.signal ?? undefined,
+    redirect: 'manual',
+    dispatcher: agent,
+  })) as unknown as Response
+  return { res, agent }
+}
+
 export async function fetchPublicPage(rawUrl: string, deps: FetchPageDeps = {}): Promise<string> {
-  const fetchFn = deps.fetch ?? fetch
   let current = rawUrl
 
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-    const url = await assertSafePublicHttpUrl(current, deps.lookup)
+    const { url, addresses } = await assertSafePublicHttpUrl(current, deps.lookup)
     let res: Response
+    let agent: Agent | undefined
     try {
-      res = await fetchFn(url.toString(), {
+      const init: RequestInit = {
         method: 'GET',
         redirect: 'manual',
         headers: {
@@ -87,40 +135,50 @@ export async function fetchPublicPage(rawUrl: string, deps: FetchPageDeps = {}):
           'User-Agent': 'ReadabilityAPI/1.0',
         },
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-      })
+      }
+      if (deps.fetch) {
+        res = await deps.fetch(url.toString(), init)
+      } else {
+        const pinned = await pinnedFetch(url, addresses, init)
+        res = pinned.res
+        agent = pinned.agent
+      }
+
+      if (res.status >= 300 && res.status < 400) {
+        const location = res.headers.get('location')
+        if (!location) {
+          throw new ClientError(`Failed to fetch URL: HTTP ${res.status}`)
+        }
+        if (hop === MAX_REDIRECTS) {
+          throw new ClientError('Failed to fetch URL: too many redirects')
+        }
+        current = resolveRedirect(url, location)
+        continue
+      }
+
+      if (!res.ok) {
+        throw new ClientError(`Failed to fetch URL: HTTP ${res.status}`)
+      }
+      if (!isAllowedContentType(res.headers.get('content-type'))) {
+        throw new ClientError('URL did not return HTML or plain text')
+      }
+
+      const html = await readCapped(res, MAX_FETCH_BYTES)
+      const text = htmlToText(html)
+      if (text.length > MAX_TEXT_CHARS) {
+        return text.slice(0, MAX_TEXT_CHARS)
+      }
+      return text
     } catch (err) {
       if (err instanceof ClientError) throw err
       if (err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError')) {
         throw new ClientError('Timed out fetching URL', 504)
       }
+      console.error('fetchPublicPage failed')
       throw new ClientError('Failed to fetch URL')
+    } finally {
+      if (agent) void agent.close()
     }
-
-    if (res.status >= 300 && res.status < 400) {
-      const location = res.headers.get('location')
-      if (!location) {
-        throw new ClientError(`Failed to fetch URL: HTTP ${res.status}`)
-      }
-      if (hop === MAX_REDIRECTS) {
-        throw new ClientError('Failed to fetch URL: too many redirects')
-      }
-      current = resolveRedirect(url, location)
-      continue
-    }
-
-    if (!res.ok) {
-      throw new ClientError(`Failed to fetch URL: HTTP ${res.status}`)
-    }
-    if (!isAllowedContentType(res.headers.get('content-type'))) {
-      throw new ClientError('URL did not return HTML or plain text')
-    }
-
-    const html = await readCapped(res, MAX_FETCH_BYTES)
-    const text = htmlToText(html)
-    if (text.length > MAX_TEXT_CHARS) {
-      return text.slice(0, MAX_TEXT_CHARS)
-    }
-    return text
   }
 
   throw new ClientError('Failed to fetch URL: too many redirects')

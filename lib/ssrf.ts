@@ -135,7 +135,7 @@ async function defaultLookup(hostname: string): Promise<string[]> {
 export async function assertSafePublicHttpUrl(
   raw: string,
   lookupFn: LookupFn = defaultLookup
-): Promise<URL> {
+): Promise<{ url: URL; addresses: string[] }> {
   const url = parsePublicHttpUrl(raw)
   const hostname = url.hostname.replace(/^\[|\]$/g, '')
 
@@ -153,5 +153,5 @@ export async function assertSafePublicHttpUrl(
     throw new ClientError('url host is not allowed')
   }
 
-  return url
+  return { url, addresses }
 }
